@@ -75,8 +75,8 @@ try {
 app.use(session({
   store: new FileStore({
     path: sessionDir,
-    ttl: 86400,
-    retries: 3, // 增加重试次数
+    ttl: 86400 * 7, // 增加到7天
+    retries: 5, // 增加重试次数
     reapInterval: 3600, // 调整清理间隔
     secret: 'html-go-secret-key',
     logFn: function(message) {
@@ -87,12 +87,12 @@ app.use(session({
     }
   }),
   secret: 'html-go-secret-key',
-  resave: false,
+  resave: true, // 修改为true确保会话始终保存
   saveUninitialized: false,
   cookie: {
     // 只在 HTTPS 环境下设置 secure为 true
     secure: false, // 如果您使用 HTTPS，请设置为 true
-    maxAge: 24 * 60 * 60 * 1000, // 24小时
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 增加到7天
     httpOnly: true,
     sameSite: 'lax'
   }
@@ -133,23 +133,28 @@ app.post('/login', (req, res) => {
   if (password === config.authPassword) {
     console.log('- 密码正确，设置认证');
 
-    // 同时使用会话和 Cookie 来存储认证状态
-    // 1. 设置会话
+    // 设置会话认证标记
     req.session.isAuthenticated = true;
     console.log('- 设置会话认证标记');
 
-    // 2. 设置 Cookie
-    res.cookie('auth', 'true', {
-      maxAge: 24 * 60 * 60 * 1000, // 24小时
-      httpOnly: true,
-      secure: false, // 如果使用 HTTPS，设置为 true
-      sameSite: 'lax'
+    // 确保会话保存后再重定向
+    req.session.save(err => {
+      if (err) {
+        console.error('会话保存错误:', err);
+      }
+      
+      // 设置 Cookie（作为备份认证方式）
+      res.cookie('auth', 'true', {
+        maxAge: 24 * 60 * 60 * 1000, // 24小时
+        httpOnly: true,
+        secure: false, // 如果使用 HTTPS，设置为 true
+        sameSite: 'lax'
+      });
+      console.log('- 设置认证 Cookie');
+      
+      console.log('- 重定向到首页');
+      res.redirect('/');
     });
-    console.log('- 设置认证 Cookie');
-
-    // 先尝试直接重定向，不等待会话保存
-    console.log('- 重定向到首页');
-    return res.redirect('/');
   } else {
     console.log('- 密码不匹配，显示错误');
     // 密码错误，显示错误信息
@@ -174,7 +179,31 @@ app.get('/logout', (req, res) => {
 const { createPage, getPageById, getRecentPages } = require('./models/pages');
 
 // 创建页面的 API 需要认证
-app.post('/api/pages/create', isAuthenticated, async (req, res) => {
+app.post('/api/pages/create', async (req, res) => {
+  // 检查认证状态
+  if (config.authEnabled) {
+    console.log('创建页面API - 认证检查:');
+    console.log('- 会话认证状态:', req.session?.isAuthenticated);
+    console.log('- Cookie认证状态:', req.cookies?.auth);
+    
+    // 检查会话认证
+    if (!(req.session && req.session.isAuthenticated)) {
+      // 检查Cookie认证
+      if (!(req.cookies && req.cookies.auth === 'true')) {
+        console.log('- 未认证，返回401状态码');
+        return res.status(401).json({
+          success: false,
+          error: '未授权，请先登录',
+          requiresAuth: true
+        });
+      } else {
+        // 同步Cookie认证到会话
+        console.log('- Cookie认证成功，同步到会话');
+        req.session.isAuthenticated = true;
+      }
+    }
+  }
+
   try {
     const { htmlContent, isProtected } = req.body;
 
@@ -233,8 +262,29 @@ app.get('/validate-password/:id', async (req, res) => {
 });
 
 // 首页路由 - 需要登录才能访问
-app.get('/', isAuthenticated, (req, res) => {
-  res.render('index', { title: 'HTML-Go | 分享 HTML 代码的简单方式' });
+app.get('/', (req, res, next) => {
+  // 检查认证功能是否启用
+  if (!config.authEnabled) {
+    console.log('认证功能未启用，允许直接访问首页');
+    return res.render('index', { title: 'HTML-Go | 分享 HTML 代码的简单方式' });
+  }
+
+  // 检查会话认证状态
+  if (req.session && req.session.isAuthenticated) {
+    console.log('会话已认证，允许访问首页');
+    return res.render('index', { title: 'HTML-Go | 分享 HTML 代码的简单方式' });
+  }
+
+  // 检查cookie认证状态
+  if (req.cookies && req.cookies.auth === 'true') {
+    console.log('Cookie已认证，同步到会话并允许访问首页');
+    req.session.isAuthenticated = true;
+    return res.render('index', { title: 'HTML-Go | 分享 HTML 代码的简单方式' });
+  }
+
+  // 未认证，重定向到登录页面
+  console.log('访问首页时未认证，重定向到登录页面');
+  res.redirect('/login');
 });
 
 // 导入代码类型检测和内容渲染工具
