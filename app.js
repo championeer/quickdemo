@@ -35,6 +35,9 @@ const app = express();
 // 确保在服务器上使用正确的端口
 const PORT = process.env.NODE_ENV === 'production' ? 8888 : config.port;
 
+// 信任代理，使express能够正确处理HTTPS请求
+app.set('trust proxy', 1);
+
 // 将配置添加到应用本地变量中，便于在中间件中访问
 app.locals.config = config;
 
@@ -45,6 +48,38 @@ app.use(bodyParser.json({ limit: '15mb' })); // JSON 解析，增加限制为15M
 app.use(bodyParser.urlencoded({ extended: true, limit: '15mb' })); // 增加限制为15MB
 app.use(cookieParser()); // 解析 Cookie
 app.use(express.static(path.join(__dirname, 'public'))); // 静态文件
+
+// 添加请求环境诊断中间件
+app.use((req, res, next) => {
+  // 记录请求基本信息
+  console.log('收到请求:', {
+    path: req.path,
+    method: req.method,
+    ip: req.ip,
+    protocol: req.protocol,
+    secure: req.secure,
+    originalUrl: req.originalUrl,
+    headers: {
+      host: req.headers.host,
+      referer: req.headers.referer,
+      'user-agent': req.headers['user-agent'],
+      cookie: req.headers.cookie ? '存在' : '不存在',
+      origin: req.headers.origin
+    }
+  });
+
+  // 在响应完成时记录会话状态
+  res.on('finish', () => {
+    console.log('响应完成 - 会话状态:', {
+      sessionID: req.sessionID || '无',
+      hasSession: !!req.session,
+      isAuthenticated: req.session?.isAuthenticated || false,
+      cookieAuth: req.cookies?.auth || '无'
+    });
+  });
+
+  next();
+});
 
 // 创建会话目录
 const sessionDir = path.join(__dirname, 'sessions');
@@ -88,14 +123,16 @@ app.use(session({
   }),
   secret: 'html-go-secret-key',
   resave: true, // 修改为true确保会话始终保存
-  saveUninitialized: false,
+  saveUninitialized: true, // 修改为true确保新会话也被保存
   cookie: {
-    // 只在 HTTPS 环境下设置 secure为 true
-    secure: false, // 如果您使用 HTTPS，请设置为 true
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 增加到7天
+    // 根据请求环境自动设置secure
+    secure: process.env.NODE_ENV === 'production', // 生产环境下设为true支持HTTPS
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7天
     httpOnly: true,
-    sameSite: 'lax'
-  }
+    sameSite: 'none' // 允许跨站点使用Cookie
+  },
+  // 信任代理，确保在代理后能正确获取客户端信息
+  proxy: true
 }));
 
 // 设置视图引擎
@@ -145,10 +182,10 @@ app.post('/login', (req, res) => {
       
       // 设置 Cookie（作为备份认证方式）
       res.cookie('auth', 'true', {
-        maxAge: 24 * 60 * 60 * 1000, // 24小时
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7天
         httpOnly: true,
-        secure: false, // 如果使用 HTTPS，设置为 true
-        sameSite: 'lax'
+        secure: process.env.NODE_ENV === 'production', // 生产环境下启用HTTPS安全
+        sameSite: 'none' // 允许跨站点使用
       });
       console.log('- 设置认证 Cookie');
       
@@ -182,24 +219,50 @@ const { createPage, getPageById, getRecentPages } = require('./models/pages');
 app.post('/api/pages/create', async (req, res) => {
   // 检查认证状态
   if (config.authEnabled) {
-    console.log('创建页面API - 认证检查:');
+    console.log('创建页面API - 认证检查详情:');
+    console.log('- 请求路径:', req.path);
+    console.log('- 会话ID:', req.sessionID);
+    console.log('- 会话对象存在:', !!req.session);
     console.log('- 会话认证状态:', req.session?.isAuthenticated);
     console.log('- Cookie认证状态:', req.cookies?.auth);
+    console.log('- 所有Cookies:', req.cookies);
+    console.log('- 认证功能启用:', config.authEnabled);
+    console.log('- 请求头中的Cookie:', req.headers.cookie);
+    console.log('- 环境:', process.env.NODE_ENV);
     
     // 检查会话认证
     if (!(req.session && req.session.isAuthenticated)) {
       // 检查Cookie认证
       if (!(req.cookies && req.cookies.auth === 'true')) {
         console.log('- 未认证，返回401状态码');
+        
+        // 尝试重置会话和Cookie
+        if (req.session) {
+          console.log('- 尝试重置会话');
+          req.session.regenerate(err => {
+            if (err) console.error('重置会话错误:', err);
+          });
+        }
+        
         return res.status(401).json({
           success: false,
           error: '未授权，请先登录',
-          requiresAuth: true
+          requiresAuth: true,
+          debug: {
+            session: !!req.session,
+            sessionID: req.sessionID || '无',
+            cookies: req.cookies || {}
+          }
         });
       } else {
         // 同步Cookie认证到会话
         console.log('- Cookie认证成功，同步到会话');
         req.session.isAuthenticated = true;
+        
+        // 确保会话保存
+        req.session.save(err => {
+          if (err) console.error('保存会话错误:', err);
+        });
       }
     }
   }
