@@ -557,6 +557,30 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ htmlContent, isProtected, codeType }),
         });
         
+        // 检查认证状态
+        if (response.status === 401) {
+          console.log('API认证失败，需要登录');
+          showErrorToast('未登录或会话已过期，即将跳转到登录页面');
+          
+          // 恢复按钮状态
+          generateButton.innerHTML = '<i class="fas fa-link mr-1"></i>生成链接';
+          generateButton.disabled = false;
+          
+          // 隐藏加载指示器
+          loadingIndicator.classList.remove('show');
+          
+          // 延迟跳转到登录页面
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 1500);
+          
+          return;
+        }
+        
+        if (!response.ok) {
+          throw new Error(`服务器响应错误: ${response.status}`);
+        }
+        
         const data = await response.json();
         console.log('API响应数据:', data); // 调试输出
         

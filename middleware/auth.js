@@ -5,7 +5,7 @@
 
 /**
  * 检查用户是否已认证
- * 如果未认证，重定向到登录页面
+ * 如果未认证，重定向到登录页面，或对API请求返回401状态码
  */
 function isAuthenticated(req, res, next) {
   console.log('认证检查:');
@@ -35,8 +35,21 @@ function isAuthenticated(req, res, next) {
     return next();
   }
 
-  // 未认证，重定向到登录页面
-  console.log('- 未认证，重定向到登录页面');
+  // 未认证的处理
+  console.log('- 未认证，根据请求类型处理');
+  
+  // 对API请求返回401状态码
+  if (req.path.startsWith('/api/')) {
+    console.log('- API请求，返回401未授权');
+    return res.status(401).json({
+      success: false,
+      error: '未授权，请先登录',
+      requiresAuth: true
+    });
+  }
+  
+  // 对页面请求重定向到登录页面
+  console.log('- 页面请求，重定向到登录页面');
   res.redirect('/login');
 }
 
