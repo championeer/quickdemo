@@ -75,11 +75,15 @@ try {
 app.use(session({
   store: new FileStore({
     path: sessionDir,
-    ttl: 86400, // 会话有效期（秒）
-    retries: 0, // 读取会话文件的重试次数
-    secret: 'html-go-secret-key', // 用于加密会话文件
+    ttl: 86400,
+    retries: 3, // 增加重试次数
+    reapInterval: 3600, // 调整清理间隔
+    secret: 'html-go-secret-key',
     logFn: function(message) {
       console.log('[session-file-store]', message);
+    },
+    errorHandler: function(err) {
+      console.error('[session-file-store] 错误:', err);
     }
   }),
   secret: 'html-go-secret-key',
