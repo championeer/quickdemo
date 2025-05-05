@@ -1,142 +1,53 @@
-# 语音生成工具 (CosyVoice)
+# Quickdemo
 
-这是一个简单易用的语音生成工具，基于CosyVoice2模型，可以将文字转换为自然的语音。
+快速分享大模型生成的HTML、Markdown、SVG、Mermaid代码（源自joeseesun的[quickshare](https://github.com/joeseesun/quickshare)项目）
 
-## 功能特点
+## 安装
 
-- **普通语音生成**：将文字转换为自然语音
-- **方言语音生成**：可生成不同方言的语音（如四川话、东北话等）
-- **情感语音生成**：可生成带有不同情感的语音（如开心、激动、平静等）
-- **情感标记语音**：使用[laughter]等标记控制语音中的情感变化
-- **分段处理长文本**：支持将长文本分段处理，适合生成长篇语音
+### Dokploy
+使用Dokploy部署，请参考[Dokploy部署文档](https://docs.dokploy.com/docs/quickstart/deploy-with-dokploy)
 
-## 使用方法
 
-1. 运行程序：
-   ```
-   python test1.py
-   ```
+## 技术栈（AI分析）
 
-2. 选择功能类型：
-   - **简单语音生成**：适合单段文本，可选普通、方言或情感语音
-   - **高级语音生成**：支持情感标记或分段处理
+**后端 (Backend)**
 
-3. 按照界面提示操作：
-   - 输入要转换的文字
-   - 选择语音类型或高级功能
-   - 根据选择输入额外信息（如方言类型、情感类型等）
+1.  **运行时环境:** Node.js
+2.  **Web 框架:** Express.js
+3.  **模板引擎:** EJS (Embedded JavaScript templates)
+4.  **数据库:** SQLite (通过 `sqlite3` 库进行交互)
+5.  **会话管理:**
+    * `express-session` (核心会话中间件)
+    * `session-file-store` (将会话存储在服务器文件系统中)
+    * `cookie-parser` (解析请求中的 Cookie)
+6.  **API & 中间件:**
+    * `body-parser` (解析请求体, 如 JSON, URL-encoded)
+    * `cors` (处理跨域资源共享)
+    * `morgan` (HTTP 请求日志记录)
+    * `crypto-js` (用于生成页面 ID 等哈希值)
+7.  **Markdown/Diagram 处理:**
+    * `marked` (将 Markdown 转换为 HTML)
+    * `mermaid` / `@mermaid-js/mermaid-cli` / `mermaid-render` (渲染 Mermaid 图表)
+    * `jsdom` (可能用于在服务器端处理或渲染 DOM 结构)
+8.  **配置管理:** `dotenv` (加载 `.env` 文件中的环境变量)
 
-4. 程序会生成语音文件并显示文件保存位置
+**前端 (Frontend)**
 
-## 示例
+1.  **核心语言:** HTML, CSS, JavaScript (ES6+)
+2.  **CSS:**
+    * 原生 CSS (使用了 CSS 变量进行主题化)
+    * 特定的样式文件 (如 `login.css`, `markdown-bytedance.css`)
+3.  **JavaScript 库:**
+    * `highlight.js` (用于代码语法高亮)
+    * 可能使用了类似 `particles.js` 的库或自定义实现（根据 `particles-config.js` 推断）来实现背景粒子效果。
+    * 原生 DOM 操作和 Fetch API (用于页面交互和 API 调用)
+4.  **图标:** 可能使用了 Font Awesome (从 CSS 类名如 `fas fa-link` 推断)。
 
-### 简单语音生成
-```
-===== 欢迎使用语音生成工具 =====
-输入'退出'或'exit'结束程序
+**开发与部署 (Development & Deployment)**
 
-请选择功能:
-1. 简单语音生成 - 输入一段文字，选择风格或方言
-2. 高级语音生成 - 使用情感标记或分段处理
-0. 退出程序
+1.  **开发工具:** `nodemon` (用于开发时自动重启服务器)
+2.  **包管理:** npm
+3.  **容器化:** Docker, Docker Compose (根据 `Dockerfile` 和 `docker-compose.yml`)
+4.  **脚本:** Shell Script (如 `start-production.sh`)
 
-请选择 (0/1/2): 1
-
-请输入要转换成语音的文字: 今天天气真好，我很开心！
-
-请选择语音类型:
-1. 普通语音
-2. 方言语音
-3. 情感语音
-请选择 (1/2/3): 2
-请输入方言类型 (如: 四川话、东北话): 四川话
-方言语音已生成: output_今天天气真好，我_四川话.wav
-```
-
-### 高级语音生成 - 情感标记
-```
-请选择功能:
-1. 简单语音生成 - 输入一段文字，选择风格或方言
-2. 高级语音生成 - 使用情感标记或分段处理
-0. 退出程序
-
-请选择 (0/1/2): 2
-
-请选择高级功能:
-1. 使用情感标记 - 如[laughter]表示笑声
-2. 分段处理长文本
-请选择 (1/2): 1
-
-情感标记示例: [laughter]表示笑声
-请输入带情感标记的文本: 这个笑话真有趣[laughter]，我笑得停不下来了[laughter]
-带情感标记的语音已生成: output_emotion_这个笑话真有趣[la.wav
-```
-
-### 高级语音生成 - 分段处理
-```
-请选择功能:
-1. 简单语音生成 - 输入一段文字，选择风格或方言
-2. 高级语音生成 - 使用情感标记或分段处理
-0. 退出程序
-
-请选择 (0/1/2): 2
-
-请输入文本段落，每段一行，输入空行结束:
-这是第一段文字，很简短。
-这是第二段文字，稍微长一些，包含了更多的信息。
-这是最后一段，总结前面的内容。
-
-请输入语音风格 (默认'开心'): 平静
-分段处理的语音已生成: output_segments_这是第一段文字，很.wav
-```
-
-## 环境要求
-
-- Python 3.6+
-- PyTorch 和 Torchaudio
-- CosyVoice2模型（需放在 pretrained_models 目录下）
-- 提示音频文件（需放在 asset 目录下）
-
-## 目录结构
-
-```
-CosyVoice/
-├── asset/
-│   └── zero_shot_prompt.wav  # 提示音频文件
-├── pretrained_models/
-│   └── CosyVoice2-0.5B/      # 预训练模型
-├── third_party/
-│   └── Matcha-TTS/           # 依赖库
-├── test1.py                  # 主程序
-└── README.md                 # 使用说明
-```
-
-## 常见问题
-
-1. **问题**：程序报错"导入错误"
-   **解决**：检查是否安装了必要的Python包，执行：`pip install torch torchaudio`
-
-2. **问题**：程序报错"初始化失败"
-   **解决**：确保模型文件和提示音频文件存在于正确的位置
-
-3. **问题**：生成的语音效果不理想
-   **解决**：尝试调整文本内容，或尝试不同的情感/方言类型
-
-## 高级用法
-
-如果你需要在自己的程序中使用这个语音生成功能，可以直接调用以下函数：
-
-```python
-# 生成普通语音
-output_file = generate_audio("你想要转换的文字", style="开心")
-
-# 生成方言语音
-output_file = generate_dialect("你想要转换的文字", dialect="四川话")
-
-# 生成带情感标记的语音
-output_file = generate_with_emotion_marks("这个笑话真有趣[laughter]")
-
-# 分段处理长文本
-segments = ["第一段文字", "第二段文字", "第三段文字"]
-output_file = generate_from_segments(segments, style="平静")
-``` 
+**总结:** 这是一个基于 **Node.js** 和 **Express** 的全栈项目，使用 **EJS** 进行服务器端渲染，**SQLite** 作为轻量级数据库，前端则主要利用原生 **HTML/CSS/JavaScript** 配合 **highlight.js** 和可能的粒子效果库实现，并使用 **Docker** 进行容器化部署。
